@@ -40,7 +40,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
-import org.apache.shiro.authz.UnauthenticatedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -551,7 +551,7 @@ public class ProductCommentServiceImpl extends ServiceImpl<ProductCommentMapper,
         String userId;
         try {
             userId = BaseContext.getUserId();
-        } catch (UnauthenticatedException e) {
+        } catch (Exception e) {
             //用户未登录
             productCommentList.forEach(productComment -> productComment.setLike(false));
             return productCommentList;
@@ -619,7 +619,7 @@ public class ProductCommentServiceImpl extends ServiceImpl<ProductCommentMapper,
         String userId;
         try {
             userId = BaseContext.getUserId();
-        } catch (UnauthenticatedException e) {
+        } catch (Exception e) {
             //用户未登录
             return false;
         }

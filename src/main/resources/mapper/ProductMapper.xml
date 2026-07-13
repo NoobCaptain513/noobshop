@@ -198,4 +198,11 @@
         WHERE p.status = 1
     </sql>
 
+    <update id="updateStockByDelta">
+        UPDATE product
+        SET stock = stock + #{delta}
+        WHERE id = #{productId}
+          AND status = 1
+    </update>
+
 </mapper>

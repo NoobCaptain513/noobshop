@@ -26,6 +26,8 @@ public interface ProductMapper extends BaseMapper<Product> {
 
 
     List<Product> getProductDetailByProductIdSet(@Param("productIdSet") Set<Long> productIdSet);
+
+    int updateStockByDelta(Long productId, Integer delta);
 }
 
 

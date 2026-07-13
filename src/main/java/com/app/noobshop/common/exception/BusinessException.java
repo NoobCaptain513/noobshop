@@ -5,8 +5,8 @@ import lombok.Getter;
  * 业务异常父类
  */
 @Getter
-public abstract class BusinessException extends RuntimeException {
-    private  int code;
+public class BusinessException extends RuntimeException {
+    private int code;
 
     public BusinessException(String message) {
         super(message);
@@ -17,4 +17,7 @@ public abstract class BusinessException extends RuntimeException {
         this.code = code;
     }
 
+    public int getCode() {
+        return code;
+    }
 }
