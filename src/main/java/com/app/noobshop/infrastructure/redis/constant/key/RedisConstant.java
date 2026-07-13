@@ -44,5 +44,7 @@ public class RedisConstant {
     public static final String AFTER_RECEIVE_TIME_UN_BEGIN = "afterReceiveTimeUnBegin";
     public static final String AFTER_RECEIVE_TIME_IN_PROGRESS = "afterReceiveTimeInProgress";
 
+    public static final String SPEC_STOCK = "specStock:";
+    public static final String STOCK = "stock:";
 }
 

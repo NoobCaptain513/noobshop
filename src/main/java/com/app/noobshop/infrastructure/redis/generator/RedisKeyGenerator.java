@@ -275,4 +275,11 @@ public class RedisKeyGenerator {
     }
 
 
+    public static String productSpecStockKey(Long specId) {
+        return RedisConstant.PREFIX_PRODUCT + RedisConstant.SPEC_STOCK + specId;
+    }
+
+    public static String productStockKey(Long productId) {
+        return RedisConstant.PREFIX_PRODUCT + RedisConstant.STOCK + productId;
+    }
 }

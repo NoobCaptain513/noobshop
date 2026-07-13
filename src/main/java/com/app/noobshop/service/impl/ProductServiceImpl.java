@@ -260,8 +260,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
             List<ProductCollection> productCollectionList = collectionService.lambdaQuery().eq(ProductCollection::getProductId, productId).list();
             userIdSet = productCollectionList.stream().map(ProductCollection::getUserId).collect(Collectors.toSet());
             RedisConnector.opsForValue().set(productCollectionKey, userIdSet);
-            RedisConnector.expire(productDetailKey, redisCacheTtlProperties.getProductCollectionTtl(), TimeUnit.SECONDS);
-
+            RedisConnector.expire(productCollectionKey, redisCacheTtlProperties.getProductCollectionTtl(), TimeUnit.SECONDS);
         }
         Product resultProduct = JacksonUtils.fromMap(productDetailMap, Product.class);
         if (userIdSet.contains(Long.valueOf(userId))) {
@@ -442,7 +441,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
     @Override
     public Result<?> getProductSpecPrice(String productId, String specId) {
         if (!bloomFilterUtils.contains(Long.valueOf(productId))) {
-            return null;
+            return Result.error(MessageConstant.DATA_ERROR);
         }
         String key = RedisKeyGenerator.productDetail(Long.valueOf(productId));
         List<ProductSpec> productSpecList = RedisConnector

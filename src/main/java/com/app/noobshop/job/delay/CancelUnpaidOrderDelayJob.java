@@ -5,6 +5,7 @@ import com.app.noobshop.infrastructure.redis.generator.RedisKeyGenerator;
 import com.app.noobshop.infrastructure.redis.properties.RedisCacheTtlProperties;
 import com.app.noobshop.service.impl.OrderServiceImpl;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBlockingQueue;
@@ -37,6 +38,7 @@ public class CancelUnpaidOrderDelayJob {
 
     private RBlockingQueue<String> blockingQueue;
     private RDelayedQueue<String> delayedQueue;
+    private volatile Thread consumerThread;
 
     private static final String BLOCKING_QUEUE_NAME = "cancelUnpaidOrderBlockingQueue";
     private static final String ORDER_CANCEL_REASON = "订单超时未支付，自动取消";
@@ -67,13 +69,24 @@ public class CancelUnpaidOrderDelayJob {
 
     private void startConsumer() {
         threadPool.execute(() -> {
+            consumerThread = Thread.currentThread();
             while (!Thread.currentThread().isInterrupted()) {
                 try {
+                    // 检查 Redisson 是否已关闭
+                    if (redissonClient.isShutdown() || redissonClient.isShuttingDown()) {
+                        log.info("Redisson 已关闭，停止消费任务");
+                        break;
+                    }
+                    
                     String orderNo = blockingQueue.take();
                     boolean isSuccess = applicationContext.getBean("orderServiceImpl", OrderServiceImpl.class).cancelOrderCommon(orderNo, ORDER_CANCEL_REASON);
                     RedisConnector.delete(RedisKeyGenerator.orderKey(orderNo));
                 } catch (InterruptedException e) {
                     log.warn("处理订单支付超时消费者线程被中断，停止运行");
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (org.redisson.RedissonShutdownException e) {
+                    log.warn("Redisson 已关闭，停止消费任务");
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
@@ -84,5 +97,17 @@ public class CancelUnpaidOrderDelayJob {
             }
         });
 
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        log.info("开始关闭 CancelUnpaidOrderDelayJob...");
+        if (consumerThread != null) {
+            consumerThread.interrupt();
+        }
+        if (delayedQueue != null) {
+            delayedQueue.destroy();
+        }
+        log.info("CancelUnpaidOrderDelayJob 已关闭");
     }
 }

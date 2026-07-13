@@ -4,6 +4,8 @@ package com.app.noobshop.infrastructure.redis.connect;
 import lombok.Setter;
 import org.springframework.data.redis.core.*;
 
+import java.util.concurrent.TimeUnit;
+
 public class StringRedisConnector {
 
     // 由配置类注入 StringRedisTemplate（处理纯字符串）
@@ -42,5 +44,34 @@ public class StringRedisConnector {
 
     public static Boolean expire(String key, long timeout, java.util.concurrent.TimeUnit unit) {
         return stringRedisTemplate.expire(key, timeout, unit);
+    }
+
+    public static Long deductStock(String stockKey, int quantity) {
+        return stringRedisTemplate.opsForHash().increment(stockKey, "stock", -quantity);
+    }
+
+    public static void incrementStock(String stockKey, Integer quantity) {
+        stringRedisTemplate.opsForHash().increment(stockKey, "stock", quantity);
+    }
+
+    public static boolean setStockIfAbsent(String stockKey, Integer dbStock, long stockCacheTtlDays, TimeUnit timeUnit) {
+        // 检查 key 是否存在且类型是否为 Hash
+        Boolean exists = stringRedisTemplate.hasKey(stockKey);
+        if (Boolean.TRUE.equals(exists)) {
+            // 如果 key 已存在但不是 Hash 类型，先删除
+            try {
+                stringRedisTemplate.opsForHash().get(stockKey, "stock");
+            } catch (Exception e) {
+                // 类型不匹配，删除旧 key
+                stringRedisTemplate.delete(stockKey);
+            }
+        }
+        
+        Boolean result = stringRedisTemplate.opsForHash().putIfAbsent(stockKey, "stock", String.valueOf(dbStock));
+        if (Boolean.TRUE.equals(result)) {
+            stringRedisTemplate.expire(stockKey, stockCacheTtlDays, timeUnit);
+            return true;
+        }
+        return false;
     }
 }

@@ -23,6 +23,18 @@ public enum CommonStatus {
         this.desc = desc;
     }
 
+    public Integer getNumber() {
+        return number;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+
     /**
      * 根据传递 number返回 value
      * @param number

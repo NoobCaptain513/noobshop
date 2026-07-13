@@ -20,7 +20,7 @@ import com.app.noobshop.pojo.emums.CommonStatus;
 import com.app.noobshop.pojo.emums.UserRoleEnum;
 import com.app.noobshop.pojo.entity.SysUser;
 import com.app.noobshop.properties.JwtProperties;
-import com.app.noobshop.security.token.JwtToken;
+
 import com.app.noobshop.service.SysLoginService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -250,8 +250,8 @@ public class SysLoginServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         UserInfo userInfo = UserInfo.builder().id(String.valueOf(userId)).build();
         String refreshTokenNew = getRefreshToken(userInfo);
         HashMap<String, Object> resultMap = new HashMap<>(2);
-        resultMap.put(JwtToken.ACCESS_TOKEN,accessTokenNew);
-        resultMap.put(JwtToken.REFRESH_TOKEN,refreshTokenNew);
+        resultMap.put("accessToken",accessTokenNew);
+        resultMap.put("refreshToken",refreshTokenNew);
         return Result.success(resultMap);
     }
 

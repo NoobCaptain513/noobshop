@@ -13,6 +13,7 @@ import org.mapstruct.ReportingPolicy;
         unmappedSourcePolicy = ReportingPolicy.IGNORE)  // 忽略源对象多余字段)
 public interface CopyMapper {
 
+    @Mapping(target = "isEnable", expression = "java(sysUser.getIsEnable() != null ? sysUser.getIsEnable().getNumber() : null)")
     UserInfo sysUserToUserInfo(SysUser sysUser);
 
     Banner bannerDTOToBanner(BannerDTO bannerDTO);

@@ -1,10 +1,10 @@
 package com.app.noobshop.common.exception;
 
-import org.apache.shiro.authc.AuthenticationException;
-
-public class InvalidCredentialsException extends AuthenticationException {
+/**
+ * 凭据无效异常
+ */
+public class InvalidCredentialsException extends RuntimeException {
     public InvalidCredentialsException(String message) {
         super(message);
     }
-
 }

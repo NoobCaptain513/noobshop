@@ -101,22 +101,26 @@ public class Test {
     @org.junit.jupiter.api.Test
     public void testEsRepository(){
         ProductDocument one = productEsRepository.getById(1L);
-        System.out.println("单个查询数据:"+one.toString());
+        System.out.println("单个查询数据:" + (one != null ? one.toString() : "null(ES中不存在id=1的文档)"));
 
         ProductDocument oneNotHave = productEsRepository.getById(0L);
-        System.out.println("查询不存在的数据" + oneNotHave);
+        System.out.println("查询不存在的数据:" + oneNotHave);
+
         List<ProductDocument> two = productEsRepository.getById(1L, 2L);
-        System.out.println("定参数批量查询"+two.get(0).toString()+two.get(1).toString());
+        System.out.println("定参数批量查询, 结果数量: " + (two != null ? two.size() : 0));
+        if (two != null) {
+            two.forEach(doc -> System.out.println("  -> " + doc));
+        }
 
         List<ProductDocument> isOne = productEsRepository.getById(0L, 1L);
-        System.out.println("查询数两个,实际存在一个,测试查询"+isOne.size());
+        System.out.println("查询两个,实际存在一个,测试查询, 结果数量: " + (isOne != null ? isOne.size() : 0));
 
         List<Long> list = List.of(2L, 3L, 4L);
         List<ProductDocument> queryList = productEsRepository.getByIdList(list);
-        System.out.println("列表 id 查询 查询出数量+"+ queryList.size()+";期望数量3");
-        NoobshopApplicationTests noobshopApplicationTests = new NoobshopApplicationTests();
-        noobshopApplicationTests.testParamCheck(null,null,null);
+        System.out.println("列表 id 查询, 查询出数量: " + (queryList != null ? queryList.size() : 0) + "; 期望数量3");
 
+        NoobshopApplicationTests noobshopApplicationTests = new NoobshopApplicationTests();
+        noobshopApplicationTests.testParamCheck(null, null, null);
     }
 
 

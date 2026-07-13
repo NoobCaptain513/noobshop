@@ -18,6 +18,7 @@ public enum ResultCode {
     USER_EXIST(20003, "用户已存在"),
 
     NO_TOKEN(10001,"无 token"),
+    PERMISSION_DENIED(10005, "权限不足"),
     ACCESS_TOKEN_EXPIRED(10002,"认证 token 过期"), //自动调用刷新接口
     REFRESH_TOKEN_EXPIRED(10003,"刷新 token 过期"),
     AUTHENTICATION_SIGNATURE_ERROR(10004,"认证签名错误/篡改");
@@ -29,5 +30,13 @@ public enum ResultCode {
     ResultCode(Integer code, String message) {
         this.code = code;
         this.message = message;
+    }
+
+    public Integer getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
     }
 }

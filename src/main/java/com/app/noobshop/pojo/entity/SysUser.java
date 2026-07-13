@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
 
+import com.app.noobshop.common.constant.DatePatternConstants;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -108,11 +111,13 @@ public class SysUser implements Serializable {
     /**
      * 首次登录时间
      */
+    @JsonFormat(pattern = DatePatternConstants.DATE_TIME_FORM, timezone = "GMT+8")
     private LocalDateTime firstLoginTime;
 
     /**
      * 最近登录时间
      */
+    @JsonFormat(pattern = DatePatternConstants.DATE_TIME_FORM, timezone = "GMT+8")
     private LocalDateTime lastLoginTime;
 
 
@@ -120,12 +125,15 @@ public class SysUser implements Serializable {
      * 创建时间
      */
     @TableField(value = "create_time", fill = FieldFill.INSERT) // 插入时自动填充
+    @JsonFormat(pattern = DatePatternConstants.DATE_TIME_FORM, timezone = "GMT+8")
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE) // 插入和更新时自动填充
+    @JsonFormat(pattern = DatePatternConstants.DATE_TIME_FORM, timezone = "GMT+8")
     private LocalDateTime updateTime;
+
 
 }

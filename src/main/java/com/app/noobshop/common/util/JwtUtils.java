@@ -47,11 +47,15 @@ public class JwtUtils {
      * @return
      */
     public static Claims parseJWT(String secretKey, String token) {
-        if (Objects.isNull(token) || !token.startsWith(JWT_PREFIX)) {
+        if (Objects.isNull(token) || token.isBlank()) {
             throw new SignatureException(MessageConstant.TOKEN_INVALID);
-
         }
-        String cleanToken = token.substring(JWT_PREFIX.length()).replaceAll("\\s", "");
+        // 兼容带 Bearer 前缀和不带前缀的 token
+        String cleanToken = token.startsWith(JWT_PREFIX)
+                ? token.substring(JWT_PREFIX.length())
+                : token;
+        cleanToken = cleanToken.replaceAll("\\s", "");
+
         SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
 
         return Jwts.parser()

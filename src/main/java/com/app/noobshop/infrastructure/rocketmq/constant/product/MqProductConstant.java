@@ -13,4 +13,6 @@ public class MqProductConstant {
 
     //==========Consumer  Group=================
     public static final String CONSUMER_GROUP_PRODUCT_DOCUMENT_SYNC = "product-document-sync-consumer-group";
+    public static final String CONSUMER_GROUP_STOCK_CHANGE_SYNC = "stock-change-sync-tag";
+    public static final String TAG_STOCK_CHANGE_SYNC = "stock-change-sync-consumer-group";
 }

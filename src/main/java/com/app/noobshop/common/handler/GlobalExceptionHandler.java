@@ -2,6 +2,7 @@ package com.app.noobshop.common.handler;
 
 
 import com.app.noobshop.common.constant.MessageConstant;
+import com.app.noobshop.common.exception.BusinessException;
 import com.app.noobshop.common.exception.EmptyObjectException;
 import com.app.noobshop.common.exception.PayException;
 import com.app.noobshop.common.result.Result;
@@ -9,8 +10,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -106,6 +112,46 @@ public class GlobalExceptionHandler {
         // 获取第一个校验失败的提示信息
         String errorMsg = Objects.requireNonNull(e.getBindingResult().getFieldError()).getDefaultMessage();
         return Result.error(errorMsg);
+    }
+
+    /**
+     * Spring Security 认证异常
+     * 令牌过期、无效、未登录
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Object> handleAuthenticationException(AuthenticationException e) {
+        log.error("认证失败: {}", e.getMessage());
+        return Result.error(MessageConstant.USER_NOT_LOGIN);
+    }
+
+    /**
+     * Spring Security 权限不足异常
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result<Object> handleAccessDeniedException(AccessDeniedException e) {
+        log.error("权限不足: {}", e.getMessage());
+        return Result.error(MessageConstant.PERMISSION_DENIED);
+    }
+
+    /**
+     * 凭据无效异常
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Object> handleBadCredentialsException(BadCredentialsException e) {
+        log.error("凭据无效: {}", e.getMessage());
+        return Result.error(MessageConstant.LOGIN_ERROR);
+    }
+
+    /**
+     * 业务异常
+     */
+    @ExceptionHandler(BusinessException.class)
+    public Result<Object> handleBusinessException(BusinessException e) {
+        log.error("业务异常: {}", e.getMessage());
+        return Result.error(e.getMessage());
     }
 
     /**
