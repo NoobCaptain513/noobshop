@@ -161,6 +161,11 @@ public class Order implements Serializable {
     @JsonFormat(pattern = DatePatternConstants.DATE_TIME_FORM)
     private LocalDateTime updateTime;
 
+    /**
+     * 乐观锁版本号（用于 CAS 更新，解决订单状态并发竞争）
+     */
+    @Version
+    private Integer version;
 
     @TableField(exist = false)
     private List<OrderItem> orderItems;

@@ -56,13 +56,14 @@ public class ProductStockServiceImpl implements ProductStockService {
 
             Long result = StringRedisConnector.deductStock(stockKey, quantity);
 
-            // Redis 未命中缓存：从数据库回源加载后重试一次
-            if (result == null || result == 0L) {
+            // Redis 未命中缓存（返回 -1）：从数据库回源加载后重试一次
+            if (result == null || result == -1L) {
                 loadStockToRedisFromDb(productId, specId, stockKey);
                 result = StringRedisConnector.deductStock(stockKey, quantity);
             }
 
-            if (result == null || result < 0) {
+            // 库存不足（返回 0）或扣减失败
+            if (result == null || result <= 0) {
                 log.warn("库存不足，回滚本次已扣减部分，orderNo:{},productId:{},specId:{}", orderNo, productId, specId);
                 rollbackRedisOnly(deductedItems);
                 throw new StockInsufficientException(productId);
@@ -85,7 +86,7 @@ public class ProductStockServiceImpl implements ProductStockService {
             Long specId = item.getSpecId();
             String stockKey = resolveStockKey(productId, specId);
 
-            // 回滚操作是加库存，天然幂等安全，直接 INCR，不需要 Lua 原子校验
+            // 回滚操作是加库存，使用 Lua 脚本原子增加
             StringRedisConnector.incrementStock(stockKey, item.getQuantity());
 
             rollbackItems.add(StockChangeMqDTO.builder()

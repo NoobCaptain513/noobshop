@@ -24,6 +24,7 @@
         <result column="logistics_no" property="logisticsNo" jdbcType="VARCHAR"/>
         <result column="order_create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="order_update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="order_version" property="version" jdbcType="INTEGER"/>
         <association property="address" javaType="com.app.noobshop.pojo.entity.Address" resultMap="AddressResultMap"/>
         <collection property="orderItems" javaType="java.util.List"
                     ofType="com.app.noobshop.pojo.entity.OrderItem"
@@ -145,6 +146,7 @@
                o.logistics_no,
                o.create_time as order_create_time,
                o.update_time as order_update_time,
+               o.version as order_version,
                oi.id,
 #              oi.order_id,
                oi.product_id,
@@ -179,6 +181,7 @@
                o.logistics_no,
                o.create_time as order_create_time,
                o.update_time as order_update_time,
+               o.version as order_version,
                ot.id,
 #              ot.order_id,
                ot.logistics_status,
@@ -209,6 +212,7 @@
                o.logistics_no,
                o.create_time as order_create_time,
                o.update_time as order_update_time,
+               o.version as order_version,
                oi.id,
 #              oi.order_id,
                oi.product_id,

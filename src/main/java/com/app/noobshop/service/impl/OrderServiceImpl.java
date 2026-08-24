@@ -104,7 +104,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         Order order = copyMapper.orderDTOToOrder(orderDTO);
         String userId = BaseContext.getUserId();
         String orderNo = snowflakeIdGenerator.generateOrderNo();
-        order.setUserId(Long.valueOf(userId)).setOrderNo(orderNo);
+        order.setUserId(Long.valueOf(userId)).setOrderNo(orderNo).setVersion(0);
         save(order);
         List<OrderItem> orderItemList = orderItems.stream()
                 .map(orderItemDTO -> copyMapper.orderItemDTOToOrderItem(orderItemDTO))
@@ -199,7 +199,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     public boolean cancelOrderCommon(String orderNo, String cancelReason) {
-        Order order = lambdaQuery().select(Order::getId, Order::getStatus).eq(Order::getOrderNo, orderNo).one();
+        Order order = lambdaQuery().select(Order::getId, Order::getStatus, Order::getVersion)
+                .eq(Order::getOrderNo, orderNo).one();
         if (Objects.isNull(order)
                 || !orderStatusTransitionService.canTransition(order.getStatus(), OrderStatusChangeEvent.CANCEL)) {
             return false;
@@ -207,8 +208,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         String now = DateUtils.formatLocalDateTime(LocalDateTime.now());
         return lambdaUpdate().eq(Order::getOrderNo, orderNo)
                 .eq(Order::getStatus, order.getStatus().getCode())
+                .eq(Order::getVersion, order.getVersion())
                 .set(Order::getStatus, OrderStatusEnum.CANCELLED.getCode()).set(Order::getCancelTime, now)
-                .set(Order::getCancelReason, cancelReason).update();
+                .set(Order::getCancelReason, cancelReason)
+                .setSql("version = version + 1")
+                .update();
     }
 
 
@@ -247,7 +251,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             throw new PayException(orderNo);
 
         }
-        Order order = lambdaQuery().select(Order::getId, Order::getStatus).eq(Order::getOrderNo, orderNo).one();
+        Order order = lambdaQuery().select(Order::getId, Order::getStatus, Order::getVersion)
+                .eq(Order::getOrderNo, orderNo).one();
         if (Objects.isNull(order)
                 || !orderStatusTransitionService.canTransition(order.getStatus(), OrderStatusChangeEvent.PAY_SUCCESS)) {
             tryNum++;
@@ -257,9 +262,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
         boolean isSuccess = lambdaUpdate().eq(Order::getOrderNo, orderNo)
                 .eq(Order::getStatus, order.getStatus().getCode())
+                .eq(Order::getVersion, order.getVersion())
                 .set(Order::getStatus, OrderStatusEnum.PENDING_SHIPMENT.getCode())
                 .set(Order::getPayType, PayTypeEnum.WECHAT_PAY)
                 .set(Order::getPayTime, LocalDateTime.now())
+                .setSql("version = version + 1")
                 .update();
         tryNum++;
         map.put(IS_SUCCESS, isSuccess);
@@ -278,7 +285,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @RemoveOrderDetailRedisCacheAnnotation
     public Result confirmOrderReceipt(String orderNo) {
         String userId = BaseContext.getUserId();
-        Order order = lambdaQuery().select(Order::getId, Order::getStatus)
+        Order order = lambdaQuery().select(Order::getId, Order::getStatus, Order::getVersion)
                 .eq(Order::getUserId, userId)
                 .eq(Order::getOrderNo, orderNo)
                 .one();
@@ -289,7 +296,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         String now = DateUtils.formatLocalDateTime(LocalDateTime.now());
         boolean isSuccess = lambdaUpdate().eq(Order::getUserId, userId).eq(Order::getOrderNo, orderNo)
                 .eq(Order::getStatus, order.getStatus().getCode())
-                .set(Order::getStatus, OrderStatusEnum.COMPLETED.getCode()).set(Order::getReceiveTime, now).update();
+                .eq(Order::getVersion, order.getVersion())
+                .set(Order::getStatus, OrderStatusEnum.COMPLETED.getCode())
+                .set(Order::getReceiveTime, now)
+                .setSql("version = version + 1")
+                .update();
         if (!isSuccess) {
             return Result.error(MessageConstant.SQL_MESSAGE_SAVE_ERROR);
         }
@@ -431,10 +442,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
        }
         Order order;
         if (Objects.isNull(orderId)) {
-            order = lambdaQuery().select(Order::getId, Order::getOrderNo, Order::getStatus)
+            order = lambdaQuery().select(Order::getId, Order::getOrderNo, Order::getStatus, Order::getVersion)
                     .eq(Order::getOrderNo, orderNo).one();
         } else {
-            order = lambdaQuery().select(Order::getId, Order::getOrderNo, Order::getStatus)
+            order = lambdaQuery().select(Order::getId, Order::getOrderNo, Order::getStatus, Order::getVersion)
                     .eq(Order::getId, orderId).one();
         }
         if (Objects.isNull(order)) {
@@ -451,11 +462,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (Objects.isNull(orderId)) {
             isSuccess = lambdaUpdate().eq(Order::getOrderNo, orderNo)
                     .eq(Order::getStatus, order.getStatus().getCode())
-                    .set(Order::getStatus, orderStatusEnum.getCode()).update();
+                    .eq(Order::getVersion, order.getVersion())
+                    .set(Order::getStatus, orderStatusEnum.getCode())
+                    .setSql("version = version + 1")
+                    .update();
         } else {
             isSuccess = lambdaUpdate().eq(Order::getId, orderId)
                     .eq(Order::getStatus, order.getStatus().getCode())
-                    .set(Order::getStatus, orderStatusEnum.getCode()).update();
+                    .eq(Order::getVersion, order.getVersion())
+                    .set(Order::getStatus, orderStatusEnum.getCode())
+                    .setSql("version = version + 1")
+                    .update();
         }
         if (isSuccess) {
             RedisConnector.delete(RedisKeyGenerator.orderKey(order.getOrderNo()));

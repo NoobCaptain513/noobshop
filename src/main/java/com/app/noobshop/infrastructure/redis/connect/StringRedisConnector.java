@@ -1,9 +1,11 @@
 package com.app.noobshop.infrastructure.redis.connect;
 
 
+import com.app.noobshop.infrastructure.redis.script.RedisLuaScripts;
 import lombok.Setter;
 import org.springframework.data.redis.core.*;
 
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 public class StringRedisConnector {
@@ -46,12 +48,31 @@ public class StringRedisConnector {
         return stringRedisTemplate.expire(key, timeout, unit);
     }
 
+    /**
+     * 使用 Lua 脚本原子扣减库存
+     * @param stockKey 库存 key
+     * @param quantity 扣减数量
+     * @return 1-成功, 0-库存不足, -1-key不存在
+     */
     public static Long deductStock(String stockKey, int quantity) {
-        return stringRedisTemplate.opsForHash().increment(stockKey, "stock", -quantity);
+        return stringRedisTemplate.execute(
+                RedisLuaScripts.DEDUCT_STOCK_SCRIPT,
+                Collections.singletonList(stockKey),
+                String.valueOf(quantity)
+        );
     }
 
+    /**
+     * 使用 Lua 脚本回滚库存（增加库存）
+     * @param stockKey 库存 key
+     * @param quantity 回滚数量
+     */
     public static void incrementStock(String stockKey, Integer quantity) {
-        stringRedisTemplate.opsForHash().increment(stockKey, "stock", quantity);
+        stringRedisTemplate.execute(
+                RedisLuaScripts.ROLLBACK_STOCK_SCRIPT,
+                Collections.singletonList(stockKey),
+                String.valueOf(quantity)
+        );
     }
 
     public static boolean setStockIfAbsent(String stockKey, Integer dbStock, long stockCacheTtlDays, TimeUnit timeUnit) {
