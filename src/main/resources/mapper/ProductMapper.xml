@@ -202,7 +202,6 @@
         UPDATE product
         SET stock = stock + #{delta}
         WHERE id = #{productId}
-          AND status = 1
     </update>
 
 </mapper>

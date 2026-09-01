@@ -18,6 +18,11 @@ import java.io.Serializable;
 public class StockChangeMqDTO implements Serializable {
 
     /**
+     * 单次库存变更唯一标识，用于消费者幂等去重
+     */
+    private String changeId;
+
+    /**
      * 关联订单号，便于排查问题时追溯
      */
     private String orderNo;

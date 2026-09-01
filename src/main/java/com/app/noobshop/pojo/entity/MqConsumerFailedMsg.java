@@ -62,6 +62,12 @@ public class MqConsumerFailedMsg {
     private Integer retryCount;
 
     /**
+     * 下次允许补偿的时间
+     */
+    @TableField("next_retry_time")
+    private LocalDateTime nextRetryTime;
+
+    /**
      * 异常信息
      */
     @TableField("error_msg")

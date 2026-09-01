@@ -1,6 +1,7 @@
 package com.app.noobshop.service.impl;
 
 import com.app.noobshop.common.exception.StockInsufficientException;
+import com.app.noobshop.common.util.JacksonUtils;
 import com.app.noobshop.infrastructure.redis.connect.StringRedisConnector;
 import com.app.noobshop.infrastructure.redis.generator.RedisKeyGenerator;
 import com.app.noobshop.infrastructure.rocketmq.constant.failed.MqFailedMessageConstant;
@@ -19,13 +20,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
 import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.springframework.stereotype.Service;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -41,6 +45,7 @@ public class ProductStockServiceImpl implements ProductStockService {
      * Redis 库存缓存兜底 TTL：DB 回源写入时顺带续期，避免长期占用内存
      */
     private static final long STOCK_CACHE_TTL_DAYS = 7;
+    private static final int MAX_MQ_SEND_RETRY = 2;
 
     @Override
     public void preDeductStock(String orderNo, List<OrderItemDTO> orderItems) {
@@ -70,6 +75,7 @@ public class ProductStockServiceImpl implements ProductStockService {
             }
 
             deductedItems.add(StockChangeMqDTO.builder()
+                    .changeId(UUID.randomUUID().toString())
                     .orderNo(orderNo).productId(productId).specId(specId)
                     .delta(-quantity).build());
         }
@@ -90,6 +96,7 @@ public class ProductStockServiceImpl implements ProductStockService {
             StringRedisConnector.incrementStock(stockKey, item.getQuantity());
 
             rollbackItems.add(StockChangeMqDTO.builder()
+                    .changeId(UUID.randomUUID().toString())
                     .orderNo(orderNo).productId(productId).specId(specId)
                     .delta(item.getQuantity()).build());
         }
@@ -133,27 +140,50 @@ public class ProductStockServiceImpl implements ProductStockService {
      */
     private void asyncSyncStockToDb(List<StockChangeMqDTO> changeList, int retryCount) {
         String destination = MqProductConstant.TOPIC_PRODUCT + ":" + MqProductConstant.TAG_STOCK_CHANGE_SYNC;
-        int maxRetry = 2;
-        rocketMQTemplate.asyncSend(destination, changeList, new SendCallback() {
-            @Override
-            public void onSuccess(SendResult sendResult) {
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                if (retryCount < maxRetry) {
-                    asyncSyncStockToDb(changeList, retryCount + 1);
-                } else {
-                    MqConsumerFailedMsg failedMsg = MqConsumerFailedMsg.builder()
-                            .topic(MqProductConstant.TOPIC_PRODUCT)
-                            .tag(MqProductConstant.TAG_STOCK_CHANGE_SYNC)
-                            .errorMsg(MqFailedMessageConstant.MQ_FAILED_ASYNC_SEND + ": " + throwable.getMessage())
-                            .body("库存变更同步落库失败: " + changeList)
-                            .retryCount(retryCount)
-                            .build();
-                    mqConsumerFailedMsgService.save(failedMsg);
+        String body = JacksonUtils.toJson(changeList);
+        try {
+            rocketMQTemplate.asyncSend(destination, changeList, new SendCallback() {
+                @Override
+                public void onSuccess(SendResult sendResult) {
+                    if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
+                        handleStockSendFailure(changeList, body, retryCount,
+                                new IllegalStateException("RocketMQ发送状态异常: "
+                                        + (sendResult == null ? "null" : sendResult.getSendStatus())));
+                    }
                 }
+
+                @Override
+                public void onException(Throwable throwable) {
+                    handleStockSendFailure(changeList, body, retryCount, throwable);
+                }
+            });
+        } catch (RuntimeException e) {
+            handleStockSendFailure(changeList, body, retryCount, e);
+        }
+    }
+
+    private void handleStockSendFailure(List<StockChangeMqDTO> changeList, String body,
+                                        int retryCount, Throwable throwable) {
+        if (retryCount < MAX_MQ_SEND_RETRY) {
+            asyncSyncStockToDb(changeList, retryCount + 1);
+            return;
+        }
+        MqConsumerFailedMsg failedMsg = MqConsumerFailedMsg.builder()
+                .bizId(changeList.isEmpty() ? null : changeList.get(0).getOrderNo())
+                .topic(MqProductConstant.TOPIC_PRODUCT)
+                .tag(MqProductConstant.TAG_STOCK_CHANGE_SYNC)
+                .errorMsg(MqFailedMessageConstant.MQ_FAILED_ASYNC_SEND + ": " + throwable.getMessage())
+                .body(body)
+                .retryCount(0)
+                .status(0)
+                .nextRetryTime(LocalDateTime.now().plusMinutes(1))
+                .build();
+        try {
+            if (!mqConsumerFailedMsgService.save(failedMsg)) {
+                log.error("库存同步失败消息保存未生效, orderNo:{}", failedMsg.getBizId(), throwable);
             }
-        });
+        } catch (RuntimeException e) {
+            log.error("库存同步失败消息无法写入兜底表, orderNo:{}", failedMsg.getBizId(), e);
+        }
     }
 }

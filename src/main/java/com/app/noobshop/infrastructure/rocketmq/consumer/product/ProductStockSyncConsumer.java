@@ -1,9 +1,8 @@
 package com.app.noobshop.infrastructure.rocketmq.consumer.product;
 
 import com.app.noobshop.infrastructure.rocketmq.constant.product.MqProductConstant;
-import com.app.noobshop.mapper.ProductMapper;
-import com.app.noobshop.mapper.ProductSpecMapper;
 import com.app.noobshop.pojo.dto.StockChangeMqDTO;
+import com.app.noobshop.service.ProductStockSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
@@ -26,28 +25,13 @@ import java.util.Objects;
         , maxReconsumeTimes = 3)
 public class ProductStockSyncConsumer implements RocketMQListener<List<StockChangeMqDTO>> {
 
-    private final ProductMapper productMapper;
-    private final ProductSpecMapper productSpecMapper;
+    private final ProductStockSyncService productStockSyncService;
 
     @Override
     public void onMessage(List<StockChangeMqDTO> changeList) {
         if (Objects.isNull(changeList) || changeList.isEmpty()) {
             return;
         }
-        for (StockChangeMqDTO change : changeList) {
-            int rows;
-            if (Objects.nonNull(change.getSpecId())) {
-                rows = productSpecMapper.updateStockByDelta(change.getSpecId(), change.getDelta());
-                // 规格库存之外，商品总库存做同步累加，用于列表页展示汇总库存
-                productMapper.updateStockByDelta(change.getProductId(), change.getDelta());
-            } else {
-                rows = productMapper.updateStockByDelta(change.getProductId(), change.getDelta());
-            }
-            if (rows == 0) {
-                // 理论上不应该发生（Redis 已经做过库存充足性校验），出现说明 DB 与 Redis 数据不一致，需要人工核对
-                log.error("库存落库更新影响行数为0，疑似DB与Redis库存不一致，orderNo:{},productId:{},specId:{},delta:{}",
-                        change.getOrderNo(), change.getProductId(), change.getSpecId(), change.getDelta());
-            }
-        }
+        productStockSyncService.syncToDatabase(changeList);
     }
 }

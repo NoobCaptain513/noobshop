@@ -44,6 +44,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.producer.SendCallback;
 import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisOperations;
@@ -51,6 +52,7 @@ import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -61,6 +63,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
         implements ProductService {
+
+    private static final int MAX_MQ_SEND_RETRY = 2;
 
     private final ProductMapper productMapper;
 
@@ -186,28 +190,50 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
                 .map(esCopyMapper::ProductToProductDocument)
                 .toList();
         String destination = MqProductConstant.TOPIC_PRODUCT + ":" + MqProductConstant.TAG_PRODUCT_DOCUMENT_SYNC;
-        int maxRetry = 2;
-        rocketMQTemplate.asyncSend(destination, productDocumentList, new SendCallback() {
-            @Override
-            public void onSuccess(SendResult sendResult) {
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                if (retryCount < maxRetry) {
-                    asyncSaveProductDocumentBySendMqMessage(productList, retryCount + 1);
-                } else {
-                    MqConsumerFailedMsg failedMsg = MqConsumerFailedMsg.builder()
-                            .topic(MqProductConstant.TOPIC_PRODUCT)
-                            .tag(MqProductConstant.TAG_PRODUCT_DOCUMENT_SYNC)
-                            .errorMsg(MqFailedMessageConstant.MQ_FAILED_ASYNC_SEND + ": " + throwable.getMessage())
-                            .body("同步商品数据到es失败,失败商品: " + productList)
-                            .retryCount(retryCount)
-                            .build();
-                    mqConsumerFailedMsgService.save(failedMsg);
+        String body = JacksonUtils.toJson(productDocumentList);
+        try {
+            rocketMQTemplate.asyncSend(destination, productDocumentList, new SendCallback() {
+                @Override
+                public void onSuccess(SendResult sendResult) {
+                    if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
+                        handleProductDocumentSendFailure(productList, body, retryCount,
+                                new IllegalStateException("RocketMQ发送状态异常: "
+                                        + (sendResult == null ? "null" : sendResult.getSendStatus())));
+                    }
                 }
+
+                @Override
+                public void onException(Throwable throwable) {
+                    handleProductDocumentSendFailure(productList, body, retryCount, throwable);
+                }
+            });
+        } catch (RuntimeException e) {
+            handleProductDocumentSendFailure(productList, body, retryCount, e);
+        }
+    }
+
+    private void handleProductDocumentSendFailure(List<Product> productList, String body,
+                                                  int retryCount, Throwable throwable) {
+        if (retryCount < MAX_MQ_SEND_RETRY) {
+            asyncSaveProductDocumentBySendMqMessage(productList, retryCount + 1);
+            return;
+        }
+        MqConsumerFailedMsg failedMsg = MqConsumerFailedMsg.builder()
+                .topic(MqProductConstant.TOPIC_PRODUCT)
+                .tag(MqProductConstant.TAG_PRODUCT_DOCUMENT_SYNC)
+                .errorMsg(MqFailedMessageConstant.MQ_FAILED_ASYNC_SEND + ": " + throwable.getMessage())
+                .body(body)
+                .retryCount(0)
+                .status(0)
+                .nextRetryTime(LocalDateTime.now().plusMinutes(1))
+                .build();
+        try {
+            if (!mqConsumerFailedMsgService.save(failedMsg)) {
+                log.error("商品文档同步失败消息保存未生效", throwable);
             }
-        });
+        } catch (RuntimeException e) {
+            log.error("商品文档同步失败消息无法写入兜底表", e);
+        }
     }
 
 
@@ -247,7 +273,10 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
             Map<String, Object> productDetailResultMap = JacksonUtils.toMap(product);
             productDetailResultMap.put(Product.Fields.isCollection, CommonStatus.INACTIVE.getNumber());
             RedisConnector.opsForHash().putAll(productDetailKey, productDetailResultMap);
-            StringRedisConnector.expire(productDetailKey, redisCacheTtlProperties.getProductDetailTtl(), TimeUnit.SECONDS);
+
+            long ttl = redisCacheTtlProperties.getProductDetailTtl()
+                     + ThreadLocalRandom.current().nextLong(0, 300); // 加 0-5 分钟随机
+            StringRedisConnector.expire(productDetailKey, ttl, TimeUnit.SECONDS);
             return Result.success(product);
 
         }
@@ -579,8 +608,3 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
 
         }
     }
-
-
-
-
-
