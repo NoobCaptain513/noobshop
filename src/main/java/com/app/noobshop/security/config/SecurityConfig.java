@@ -56,15 +56,21 @@ public class SecurityConfig {
                     "/api/user/login/**",
                     "/api/user/refresh/**",
                     "/api/user/create/account",
-                    "/api/user/forget/password",
-                    "/api/user/change/password"
+                    "/api/user/forget/password"
                 ).permitAll()
                 .requestMatchers(
                     "/api/banner/list",
-                    "/api/product/**",
+                    "/api/product/hot",
+                    "/api/product/brief/list",
+                    "/api/product/detail",
+                    "/api/product/categroy/list",
+                    "/api/product/search",
+                    "/api/product/related",
+                    "/api/product/spec/price",
+                    "/api/product/scroll/query/list",
+                    "/api/product/user/keyword/list",
                     "/api/category/**",
                     "/api/notice/**",
-                    "/api/upload/image",
                     "/api/about/us/introduce"
                 ).permitAll()
                 // Swagger 文档

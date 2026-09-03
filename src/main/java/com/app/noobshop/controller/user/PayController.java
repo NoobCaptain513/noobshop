@@ -7,12 +7,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.ORDER_PAY;
 
 @RestController
 @RequestMapping("/api/pay")
@@ -24,6 +27,7 @@ public class PayController {
     private PayService payService;
 
     @PostMapping("/wxpay")
+    @PreAuthorize(ORDER_PAY)
     @Operation(summary = "微信支付预下单")
     public Result<PrepayWithRequestPaymentResponse> wxPay(@RequestBody Map<String, String> params) {
         String orderNo = params.get("orderNo");

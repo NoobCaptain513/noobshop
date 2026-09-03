@@ -12,7 +12,10 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.*;
 
 @RestController
 @RequestMapping("/api/user")
@@ -31,6 +34,7 @@ public class UserController {
      * @return
      */
     @GetMapping("/detail/get")
+    @PreAuthorize(USER_READ)
     @Operation(summary = "查询用户详情", description = "获取当前登录用户的详细信息")
     public Result getUserDetail() {
         return userService.getUserDetail();
@@ -43,6 +47,7 @@ public class UserController {
      * @return
      */
     @PutMapping("/detail/update")
+    @PreAuthorize(USER_UPDATE)
     @Operation(summary = "修改用户详情", description = "更新当前登录用户的详细信息")
     public Result updateUserDetail(@RequestBody @NotNull UserDetailDTO userDetailDTO) {
         return userService.updateUserDetail(userDetailDTO);
@@ -55,6 +60,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/collect/add")
+    @PreAuthorize(COLLECTION_MANAGE)
     @Operation(summary = "新增商品收藏", description = "收藏指定商品（通过商品ID）")
     public Result addCollection(@RequestParam @NotBlank String productId) {
         return collectionService.addCollection(productId);
@@ -67,6 +73,7 @@ public class UserController {
      * @return
      */
     @DeleteMapping("/collect/delete")
+    @PreAuthorize(COLLECTION_MANAGE)
     @Operation(summary = "删除商品收藏", description = "支持单个或批量删除收藏的商品（商品ID以逗号分隔）")
     public Result deleteCollection(@RequestParam String productIds) {
         return collectionService.deleteCollection(productIds);
@@ -78,6 +85,7 @@ public class UserController {
      * @return 简单商品封装列表
      */
     @GetMapping("/collect/list")
+    @PreAuthorize(COLLECTION_MANAGE)
     @Operation(summary = "查询收藏列表", description = "分页获取当前登录用户的商品收藏列表，默认页码1、每页10条")
     public Result<SimpleCursorCommonResult>getCollectionList(@Valid SimpleCursorCommonEntity simpleCursorCommonEntity) {
         return collectionService.getCollectionList(simpleCursorCommonEntity);

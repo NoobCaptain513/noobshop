@@ -8,7 +8,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.CATEGORY_MANAGE;
 
 @RestController
 @RequestMapping("/api")
@@ -37,6 +40,7 @@ public class CategoryController {
      * @return
      */
     @PostMapping("/admin/category/add")
+    @PreAuthorize(CATEGORY_MANAGE)
     @Operation(summary = "管理员新增分类", description = "管理端，管理员新增商品分类")
     public Result addCategory(@RequestBody CategoryDTO categoryDTO) {
         return categoryService.addCategory(categoryDTO);
@@ -49,6 +53,7 @@ public class CategoryController {
      * @return
      */
     @DeleteMapping("/admin/category/{categoryId}")
+    @PreAuthorize(CATEGORY_MANAGE)
     @Operation(summary = "管理员删除分类", description = "管理端，管理员根据分类ID删除分类")
     public Result deleteCategory(@PathVariable String categoryId) {
         return categoryService.deleteCategory(categoryId);
@@ -61,6 +66,7 @@ public class CategoryController {
      * @return
      */
     @PutMapping("/admin/category/{id}")
+    @PreAuthorize(CATEGORY_MANAGE)
     @Operation(summary = "管理员修改分类信息", description = "管理端，管理员根据分类ID修改分类详情")
     public Result updateCategoryInfo(@PathVariable String id, @RequestBody CategoryDTO categoryDTO) {
         return categoryService.updateCategoryInfo(id, categoryDTO);
@@ -74,6 +80,7 @@ public class CategoryController {
      * @return
      */
     @PutMapping("/admin/category/{id}/status")
+    @PreAuthorize(CATEGORY_MANAGE)
     @Operation(summary = "管理员修改分类状态", description = "管理端，管理员根据分类ID更新分类状态")
     public Result updateCategoryStatus(@PathVariable String id, @RequestParam String status) {
         return categoryService.updateCategoryStatus(id, status);

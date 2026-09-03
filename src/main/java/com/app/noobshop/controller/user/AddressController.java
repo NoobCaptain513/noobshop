@@ -7,7 +7,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.ADDRESS_MANAGE;
 
 @RestController
 @RequestMapping("/api/address")
@@ -22,6 +25,7 @@ public class AddressController {
      * @return
      */
     @GetMapping("/list")
+    @PreAuthorize(ADDRESS_MANAGE)
     @Operation(summary = "查询地址列表", description = "用户查看自己的地址列表")
     public Result getAddressList() {
         return addressService.getAddressList();
@@ -34,6 +38,7 @@ public class AddressController {
      * @return
      */
     @PostMapping("/add")
+    @PreAuthorize(ADDRESS_MANAGE)
     @Operation(summary = "新增地址", description = "用户新增地址")
     public Result insertAddress(@RequestBody @Valid AddressDTO addressDTO) {
         return addressService.insertAddress(addressDTO);
@@ -47,6 +52,7 @@ public class AddressController {
      * @return
      */
     @PutMapping("/update")
+    @PreAuthorize(ADDRESS_MANAGE)
     @Operation(summary = "修改地址",description = "用户修改地址")
     public Result updateAddress(@RequestBody @Valid AddressDTO addressDTO) {
         return addressService.updateAddress(addressDTO);
@@ -60,6 +66,7 @@ public class AddressController {
      * @return
      */
     @DeleteMapping("/delete")
+    @PreAuthorize(ADDRESS_MANAGE)
     @Operation(summary = "删除地址",description = "用户删除地址")
     public Result deleteAddress(@RequestParam String id) {
         return addressService.deleteAddress(id);

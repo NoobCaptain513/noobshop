@@ -7,10 +7,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.COUPON_RELEASE;
 
 @RestController
 @RequestMapping("/api")
@@ -22,6 +25,7 @@ public class CouponController {
 
 
     @PostMapping("/admin/coupon/release")
+    @PreAuthorize(COUPON_RELEASE)
     public Result<?> saveCouponAdmin(@RequestBody @Valid @NotNull CouponCreateDTO couponCreateDTO) {
         return couponService.saveCouponAdmin(couponCreateDTO);
     }

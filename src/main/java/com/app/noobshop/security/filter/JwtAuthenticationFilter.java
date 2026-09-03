@@ -5,6 +5,7 @@ import com.app.noobshop.common.context.BaseContext;
 import com.app.noobshop.common.result.UserInfo;
 import com.app.noobshop.common.util.JwtUtils;
 import com.app.noobshop.properties.JwtProperties;
+import com.app.noobshop.security.service.CustomUserDetailsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -15,21 +16,19 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -39,10 +38,21 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProperties jwtProperties;
+    private final CustomUserDetailsService userDetailsService;
+
+    @Autowired
+    public JwtAuthenticationFilter(JwtProperties jwtProperties,
+                                   CustomUserDetailsService userDetailsService) {
+        this.jwtProperties = jwtProperties;
+        this.userDetailsService = userDetailsService;
+    }
+
+    public JwtAuthenticationFilter(JwtProperties jwtProperties) {
+        this(jwtProperties, null);
+    }
 
     // Optional 认证路径正则（评论区查看接口）
     private static final Pattern OPTIONAL_AUTH_PATTERN = Pattern.compile("/api/user/product/comment/.*/show");
@@ -79,18 +89,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = JwtUtils.parseJWT(jwtProperties.getUserSecretKey(), token);
                 String userId = claims.get(JwtTokenClaimsConstant.SYS_USER_ID).toString();
 
-                // 从 Claims 中获取角色信息（如果有）
-                List<GrantedAuthority> authorities = extractAuthorities(claims);
-
-                // 构建 UserDetails
-                UserDetails userDetails = new User(userId, "", authorities);
+                // 权限保存在服务端缓存中，角色变更后删除缓存即可立即生效。
+                UserDetails userDetails = userDetailsService == null
+                        ? new User(userId, "", List.of())
+                        : userDetailsService.loadUserByUsername(userId);
 
                 // 构建认证对象
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 token,
-                                authorities
+                                userDetails.getAuthorities()
                         );
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
@@ -114,7 +123,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (!isOptionalPath) {
                     request.setAttribute("jwt-exception", e);
                 }
-            } catch (JwtException e) {
+            } catch (JwtException | UsernameNotFoundException e) {
                 log.warn("Token 验证失败: {}", e.getMessage());
                 SecurityContextHolder.clearContext();
                 if (!isOptionalPath) {
@@ -140,43 +149,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         // 也支持不带 Bearer 前缀的直接 Token
         return bearerToken;
-    }
-
-    /**
-     * 从 Claims 中提取权限信息
-     */
-    private List<GrantedAuthority> extractAuthorities(Claims claims) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-
-        // 尝试从 Claims 获取角色
-        Object rolesObj = claims.get("roles");
-        if (rolesObj != null) {
-            if (rolesObj instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<String> roles = (List<String>) rolesObj;
-                for (String role : roles) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
-                }
-            } else if (rolesObj instanceof String) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + rolesObj));
-            }
-        }
-
-        // 尝试从 Claims 获取权限
-        Object permsObj = claims.get("permissions");
-        if (permsObj != null) {
-            if (permsObj instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<String> perms = (List<String>) permsObj;
-                for (String perm : perms) {
-                    authorities.add(new SimpleGrantedAuthority(perm));
-                }
-            } else if (permsObj instanceof String) {
-                authorities.add(new SimpleGrantedAuthority((String) permsObj));
-            }
-        }
-
-        return authorities;
     }
 
     /**
@@ -213,12 +185,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                path.startsWith("/api/user/refresh") ||
                path.startsWith("/api/user/create/account") ||
                path.startsWith("/api/user/forget/password") ||
-               path.startsWith("/api/user/change/password") ||
                path.startsWith("/api/banner") ||
-               path.startsWith("/api/product") ||
+               isPublicProductPath(path) ||
                path.startsWith("/api/category") ||
                path.startsWith("/api/notice") ||
-               path.startsWith("/api/upload") ||
                path.startsWith("/api/about") ||
                path.startsWith("/swagger-ui") ||
                path.startsWith("/v3/api-docs") ||
@@ -226,5 +196,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                path.startsWith("/css/") ||
                path.startsWith("/js/") ||
                path.startsWith("/images/");
+    }
+
+    private boolean isPublicProductPath(String path) {
+        return path.startsWith("/api/product")
+                && !path.contains("/admin/");
     }
 }

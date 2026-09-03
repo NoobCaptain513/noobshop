@@ -20,6 +20,7 @@ import com.app.noobshop.pojo.emums.CommonStatus;
 import com.app.noobshop.pojo.emums.UserRoleEnum;
 import com.app.noobshop.pojo.entity.SysUser;
 import com.app.noobshop.properties.JwtProperties;
+import com.app.noobshop.security.constant.SecurityCacheConstants;
 
 import com.app.noobshop.service.SysLoginService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -81,11 +83,15 @@ public class SysLoginServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
             return;
         }
         String key = RedisKeyGenerator.loginUser(user.getId());
-        HashMap<String, Object> loginUserMap = new HashMap<>(4);
+        HashMap<String, Object> loginUserMap = new HashMap<>(5);
         loginUserMap.put(SysUser.Fields.userInfo, userInfo);
         loginUserMap.put(SysUser.Fields.isEnable, CommonStatus.ACTIVE.getNumber());
-        loginUserMap.put(SysUser.Fields.sysRoleList, user.getSysRoleList());
-        loginUserMap.put(SysUser.Fields.sysPermissionList, user.getSysPermissionList());
+        loginUserMap.put(SysUser.Fields.sysRoleList,
+                Objects.requireNonNullElseGet(user.getSysRoleList(), List::of));
+        loginUserMap.put(SysUser.Fields.sysPermissionList,
+                Objects.requireNonNullElseGet(user.getSysPermissionList(), List::of));
+        loginUserMap.put(SecurityCacheConstants.AUTHORIZATION_VERSION_FIELD,
+                SecurityCacheConstants.AUTHORIZATION_VERSION);
         RedisConnector.opsForHash().putAll(key, loginUserMap);
         RedisConnector.expire(key, jwtProperties.getLoginUserInfoInRedisTtl(), TimeUnit.DAYS);
     }
@@ -137,8 +143,9 @@ public class SysLoginServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
             userNew.setOpenid(openid).setNickname(userWechatDTO.getNickName()).setAvatar(userWechatDTO.getAvatarUrl()).setFirstLoginTime(LocalDateTime.now()).setLastLoginTime(LocalDateTime.now());
             save(userNew);
             sysUserMapper.insertSysUserConnectSysRole(userNew.getId(), UserRoleEnum.ROLE_BUYER.getId());
-            UserInfo userInfo = copyMapper.sysUserToUserInfo(userNew);
-            setUserInfoToRedis(userNew, userInfo);
+            SysUser userWithAuthorities = getSysUserByUserIdWithRolesAndPermissions(userNew.getId());
+            UserInfo userInfo = copyMapper.sysUserToUserInfo(userWithAuthorities);
+            setUserInfoToRedis(userWithAuthorities, userInfo);
             String accessToken = getAccessToken(userInfo);
             String refreshToken = getRefreshToken(userInfo);
             return Result.success(new LoginInfo(accessToken,refreshToken, userInfo));

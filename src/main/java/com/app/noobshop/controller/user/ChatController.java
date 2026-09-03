@@ -12,9 +12,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.CHAT_ACCESS;
 
 /**
  * 实时聊天相关接口
@@ -29,6 +32,7 @@ public class ChatController {
     private final ChatService chatService;
 
     @GetMapping("/sessions")
+    @PreAuthorize(CHAT_ACCESS)
     @Operation(summary = "获取当前用户的会话列表")
     public Result<List<ChatSessionVO>> getSessionList() {
         Long userId = Long.valueOf(BaseContext.getUserId());
@@ -37,6 +41,7 @@ public class ChatController {
     }
 
     @GetMapping("/customer-service/assign")
+    @PreAuthorize(CHAT_ACCESS)
     @Operation(summary = "分配客服", description = "优先分配在线客服，无在线客服时返回一个启用客服作为兜底")
     public Result<CustomerServiceVO> assignCustomerService() {
         Long userId = Long.valueOf(BaseContext.getUserId());
@@ -48,6 +53,7 @@ public class ChatController {
     }
 
     @GetMapping("/history/{contactId}")
+    @PreAuthorize(CHAT_ACCESS)
     @Operation(summary = "分页获取与某人的聊天历史")
     public Result<PageResult> getChatHistory(
             @PathVariable Long contactId,
@@ -67,6 +73,7 @@ public class ChatController {
     }
 
     @PostMapping("/clearUnread/{contactId}")
+    @PreAuthorize(CHAT_ACCESS)
     @Operation(summary = "手动清除某会话的未读数")
     public Result<Void> clearUnread(@PathVariable Long contactId) {
         Long userId = Long.valueOf(BaseContext.getUserId());

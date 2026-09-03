@@ -7,6 +7,10 @@ import com.app.noobshop.mapper.SysUserMapper;
 import com.app.noobshop.pojo.entity.SysPermission;
 import com.app.noobshop.pojo.entity.SysRole;
 import com.app.noobshop.pojo.entity.SysUser;
+import com.app.noobshop.pojo.emums.CommonStatus;
+import com.app.noobshop.properties.JwtProperties;
+import com.app.noobshop.security.constant.SecurityCacheConstants;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.GrantedAuthority;
@@ -17,7 +21,12 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 自定义 UserDetailsService - 替代 Shiro 的 CustomRealm
@@ -29,6 +38,7 @@ import java.util.List;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final SysUserMapper sysUserMapper;
+    private final JwtProperties jwtProperties;
 
     /**
      * 根据用户ID加载用户信息
@@ -84,7 +94,25 @@ public class CustomUserDetailsService implements UserDetailsService {
             UserInfo userInfo = RedisConnector.getHashField(userKey, SysUser.Fields.userInfo, UserInfo.class);
 
             if (userInfo != null) {
-                return convertToSysUser(userInfo);
+                Object authorizationVersion = RedisConnector.opsForHash()
+                        .get(userKey, SecurityCacheConstants.AUTHORIZATION_VERSION_FIELD);
+                if (!SecurityCacheConstants.AUTHORIZATION_VERSION.equals(String.valueOf(authorizationVersion))
+                        || !Boolean.TRUE.equals(RedisConnector.opsForHash()
+                        .hasKey(userKey, SysUser.Fields.sysRoleList))
+                        || !Boolean.TRUE.equals(RedisConnector.opsForHash()
+                        .hasKey(userKey, SysUser.Fields.sysPermissionList))) {
+                    return null;
+                }
+                SysUser user = convertToSysUser(userInfo);
+                user.setSysRoleList(RedisConnector.getHashField(
+                        userKey, SysUser.Fields.sysRoleList, new TypeReference<List<SysRole>>() {}));
+                user.setSysPermissionList(RedisConnector.getHashField(
+                        userKey, SysUser.Fields.sysPermissionList, new TypeReference<List<SysPermission>>() {}));
+                Integer enabled = RedisConnector.getHashField(
+                        userKey, SysUser.Fields.isEnable, Integer.class);
+                user.setIsEnable(Integer.valueOf(0).equals(enabled)
+                        ? CommonStatus.INACTIVE : CommonStatus.ACTIVE);
+                return user;
             }
         } catch (Exception e) {
             log.warn("从 Redis 加载用户信息失败，userId: {}", userId, e);
@@ -116,8 +144,19 @@ public class CustomUserDetailsService implements UserDetailsService {
     private void cacheUserToRedis(SysUser user) {
         try {
             String userKey = RedisKeyGenerator.loginUser(user.getId());
-            UserInfo userInfo = buildUserInfo(user);
-            RedisConnector.opsForHash().put(userKey, SysUser.Fields.userInfo, userInfo);
+            Map<String, Object> loginUserMap = new HashMap<>(5);
+            loginUserMap.put(SysUser.Fields.userInfo, buildUserInfo(user));
+            loginUserMap.put(SysUser.Fields.isEnable,
+                    Objects.nonNull(user.getIsEnable()) ? user.getIsEnable().getNumber() : 1);
+            loginUserMap.put(SysUser.Fields.sysRoleList,
+                    Objects.requireNonNullElseGet(user.getSysRoleList(), List::of));
+            loginUserMap.put(SysUser.Fields.sysPermissionList,
+                    Objects.requireNonNullElseGet(user.getSysPermissionList(), List::of));
+            loginUserMap.put(SecurityCacheConstants.AUTHORIZATION_VERSION_FIELD,
+                    SecurityCacheConstants.AUTHORIZATION_VERSION);
+            RedisConnector.opsForHash().putAll(userKey, loginUserMap);
+            RedisConnector.expire(userKey,
+                    jwtProperties.getLoginUserInfoInRedisTtl(), TimeUnit.DAYS);
         } catch (Exception e) {
             log.warn("缓存用户信息到 Redis 失败，userId: {}", user.getId(), e);
         }
@@ -136,6 +175,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         userInfo.setPhone(user.getPhone());
         userInfo.setUserType(user.getUserType());
         userInfo.setIsEnable(user.getIsEnable() != null ? user.getIsEnable().getNumber() : 1);
+        userInfo.setSysRoleList(user.getSysRoleList());
         return userInfo;
     }
 
@@ -151,6 +191,9 @@ public class CustomUserDetailsService implements UserDetailsService {
         user.setOpenid(userInfo.getOpenid());
         user.setPhone(userInfo.getPhone());
         user.setUserType(userInfo.getUserType());
+        user.setSysRoleList(userInfo.getSysRoleList());
+        user.setIsEnable(Integer.valueOf(0).equals(userInfo.getIsEnable())
+                ? CommonStatus.INACTIVE : CommonStatus.ACTIVE);
         return user;
     }
 
@@ -158,12 +201,13 @@ public class CustomUserDetailsService implements UserDetailsService {
      * 构建权限列表
      */
     private List<GrantedAuthority> buildAuthorities(SysUser user) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
+        LinkedHashSet<GrantedAuthority> authorities = new LinkedHashSet<>();
 
         // 添加角色权限
         if (user.getSysRoleList() != null) {
             for (SysRole role : user.getSysRoleList()) {
-                if (role.getRoleCode() != null) {
+                if (role.getRoleCode() != null
+                        && role.getIsEnable() != CommonStatus.INACTIVE) {
                     // Spring Security 角色需要以 ROLE_ 开头
                     String roleCode = role.getRoleCode();
                     if (!roleCode.startsWith("ROLE_")) {
@@ -178,14 +222,15 @@ public class CustomUserDetailsService implements UserDetailsService {
         // 添加操作权限
         if (user.getSysPermissionList() != null) {
             for (SysPermission permission : user.getSysPermissionList()) {
-                if (permission.getPermCode() != null) {
+                if (permission.getPermCode() != null
+                        && permission.getIsEnable() != CommonStatus.INACTIVE) {
                     authorities.add(new SimpleGrantedAuthority(permission.getPermCode()));
                     log.debug("添加操作权限: {}", permission.getPermCode());
                 }
             }
         }
 
-        return authorities;
+        return new ArrayList<>(authorities);
     }
 
     /**

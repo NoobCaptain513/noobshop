@@ -22,9 +22,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.COMMENT_LIKE;
+import static com.app.noobshop.security.constant.SecurityExpressions.COMMENT_WRITE;
+import static com.app.noobshop.security.constant.SecurityExpressions.PRODUCT_MANAGE;
 
 @Slf4j
 @RestController
@@ -125,6 +130,7 @@ public class ProductController {
     }
 
     @PutMapping("/product/admin/{productId}/images")
+    @PreAuthorize(PRODUCT_MANAGE)
     @Operation(summary = "管理员更新商品图片集", description = "传入 OSS URL 列表，按顺序替换 product_image 中的商品图片")
     public Result<?> updateProductImages(@PathVariable("productId") Long productId,
                                          @RequestBody List<String> imageUrls) {
@@ -156,6 +162,7 @@ public class ProductController {
      * @return
      */
     @GetMapping("/product/admin/keyword/list")
+    @PreAuthorize(PRODUCT_MANAGE)
     @Operation(summary = "管理员查询搜索关键词列表", description = "管理端，管理员获取所有搜索关键词列表")
     public Result<?> getProductSearchKeywordListAdmin() {
         return productSearchKeywordService.getProductSearchKeywordListAdmin();
@@ -167,6 +174,7 @@ public class ProductController {
      * @return
      */
     @PutMapping("/product/admin/keyword/update")
+    @PreAuthorize(PRODUCT_MANAGE)
     @Operation(summary = "管理员修改搜索关键词", description = "管理端，管理员批量更新搜索关键词列表")
     public Result<?> updateProductSearchListAdmin(@RequestBody List<ProductSearchKeyword> productSearchKeywordList) {
         return productSearchKeywordService.updateProductSearchListAdmin(productSearchKeywordList);
@@ -215,6 +223,7 @@ public class ProductController {
      */
     @Operation(summary = "用户发表一级商品评论", description = "")
     @PostMapping("/user/product/comment/firstComment/save")
+    @PreAuthorize(COMMENT_WRITE)
     public Result<?> saveProductFirstComment(@RequestBody @Valid FirstProductCommentDTO firstProductCommentDTO) {
         return productCommentService.saveProductFirstComment(firstProductCommentDTO);
     }
@@ -224,6 +233,7 @@ public class ProductController {
      */
     @Operation(summary = "用户发表二级以上商品评论", description = "")
     @PostMapping("/user/product/comment/secondComment/save")
+    @PreAuthorize(COMMENT_WRITE)
     public Result<?> saveProductSecondComment(@RequestBody @Valid SecondProductCommentDTO secondProductCommentDTO) {
         return productCommentService.saveProductSecondComment(secondProductCommentDTO);
     }
@@ -236,6 +246,7 @@ public class ProductController {
 
     @Operation(summary = "用户对一级评论进行追评", description = "")
     @PostMapping("/user/product/comment/firstComment/append")
+    @PreAuthorize(COMMENT_WRITE)
     public Result<?> appendProductFirstComment(@Valid @RequestBody @NotNull AppendProductFirstCommentDTO appendProductFirstCommentDTO) {
         return productCommentService.appendProductFirstComment(appendProductFirstCommentDTO);
     }
@@ -250,6 +261,7 @@ public class ProductController {
 
     @Operation(summary = "对商品进行点赞和取消点赞")
     @PutMapping("/user/product/comment/like")
+    @PreAuthorize(COMMENT_LIKE)
     public Result<?> updateProductCommentLike(@RequestParam @NotBlank String productCommentId
             , @RequestParam @NotNull Integer isLike
             , @RequestParam @NotNull Integer isFirstComment) {

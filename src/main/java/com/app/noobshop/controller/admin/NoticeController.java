@@ -6,7 +6,10 @@ import com.app.noobshop.service.NoticeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.NOTICE_MANAGE;
 
 @RestController
 @RequestMapping("/api")
@@ -34,6 +37,7 @@ public class NoticeController {
      * @return
      */
     @PostMapping("/admin/notice/add")
+    @PreAuthorize(NOTICE_MANAGE)
     @Operation(summary = "管理员新增通知", description = "管理端，管理员新增系统通知")
     public Result addNotice(@RequestBody NoticeDTO noticeDTO) {
         return noticeService.addNotice(noticeDTO);
@@ -45,6 +49,7 @@ public class NoticeController {
      * @return
      */
     @PutMapping("/admin/notice/update")
+    @PreAuthorize(NOTICE_MANAGE)
     @Operation(summary = "管理员修改通知", description = "管理端，管理员更新已存在的系统通知")
     public Result updateNotice(@RequestBody NoticeDTO noticeDTO) {
         return noticeService.updateNotice(noticeDTO);
@@ -56,6 +61,7 @@ public class NoticeController {
      * @return
      */
     @DeleteMapping("/admin/notice/delete")
+    @PreAuthorize(NOTICE_MANAGE)
     @Operation(summary = "管理员删除通知", description = "管理端，管理员根据通知ID删除指定系统通知")
     public Result deleteNotice(@RequestParam String id){
         return noticeService.deleteNotice(id);

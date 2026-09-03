@@ -14,6 +14,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.USER_READ;
+import static com.app.noobshop.security.constant.SecurityExpressions.USER_UPDATE;
+
 @RestController
 @RequestMapping("/api/user")
 @Tag(name = "用户登录注册管理")
@@ -49,6 +54,7 @@ public class LoginController {
      * @return
      */
     @GetMapping("/info")
+    @PreAuthorize(USER_READ)
     @Operation(summary = "获取用户信息", description = "获取当前登录用户的个人信息")
     public Result getUser() {
         return loginService.getUser();
@@ -60,6 +66,7 @@ public class LoginController {
      * @return
      */
     @PostMapping("/logout")
+    @PreAuthorize(USER_READ)
     @Operation(summary = "退出登录", description = "用户退出登录，清除当前登录状态")
     public Result logout() {
         String userId = BaseContext.getUserId();
@@ -107,6 +114,7 @@ public class LoginController {
      * @return
      */
     @PutMapping("/change/password")
+    @PreAuthorize(USER_UPDATE)
     @Operation(summary = "修改密码", description = "验证旧密码后，修改为新密码")
     public Result changePassword(@RequestParam @NotBlank String username
             , @RequestParam @NotBlank String passwordOld

@@ -9,9 +9,12 @@ import com.app.noobshop.service.BannerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static com.app.noobshop.security.constant.SecurityExpressions.BANNER_MANAGE;
 
 @RestController
 @RequestMapping("/api")
@@ -36,6 +39,7 @@ public class BannerController {
      *
      */
     @GetMapping("/admin/banner/list")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员查询联播图列表", description = "管理端,管理员获取联播图列表")
     public Result<List<Banner>> getBannerListByAdmin(@RequestParam(name = "pageNum" , defaultValue = "1") Integer pageNum
             , @RequestParam(name = "pageSize" , defaultValue = "10") Integer pageSize)  {
@@ -48,6 +52,7 @@ public class BannerController {
      * @return
      */
     @PostMapping("/admin/banner/add")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员新增联播图", description = "管理端,管理员新增联播图")
     public Result addBanner(@RequestBody BannerDTO bannerDTO) {
         return bannerService.addBanner(bannerDTO);
@@ -60,6 +65,7 @@ public class BannerController {
      * @return
      */
     @PutMapping("/admin/banner/update")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员修改联播图", description = "管理端,管理员修改联播图")
     public Result updateBanner(@RequestBody BannerDTO bannerDTO) {
         return bannerService.updateBanner(bannerDTO);
@@ -72,6 +78,7 @@ public class BannerController {
      * @return
      */
     @DeleteMapping("/admin/banner/delete")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员删除联播图", description = "管理端,管理员删除联播图")
     public Result deleteBanner(@RequestParam Long id) {
         return bannerService.deleteBanner(id);
@@ -83,6 +90,7 @@ public class BannerController {
      * @return
      */
     @PutMapping("/admin/banner/updateSort")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员修改联播图排序", description = "管理端,管理员修改联播图排序")
     public Result updateSort(@RequestBody BannerSortDTO bannerSortDTO) {
         return bannerService.updateSort(bannerSortDTO);
@@ -93,6 +101,7 @@ public class BannerController {
      * @return
      */
     @PutMapping("/admin/banner/updateStatus")
+    @PreAuthorize(BANNER_MANAGE)
     @Operation(summary = "管理员修改联播图状态", description = "管理端,管理员修改联播图状态")
     public Result updateStatus(@RequestBody BannerStatusDTO bannerStatusDTO) {
         return bannerService.updateStatus(bannerStatusDTO);
