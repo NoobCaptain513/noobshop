@@ -10,16 +10,16 @@
 *   **数据持久化**：MySQL 8.x, MyBatis & MyBatis-Plus
 *   **多级缓存**：Caffeine (JVM 本地缓存), Redis (分布式缓存)
 *   **搜索引擎**：Elasticsearch (提供商品高命中精准检索)
-*   **消息队列**：RocketMQ (实现订单、异步消息、状态流转解耦)
+*   **消息队列**：RocketMQ (实现库存同步等异步业务解耦，并提供消费幂等与失败重试兜底)
 *   **实时通信**：Netty (搭建高性能在线客服系统 WebSocket 服务)
-*   **权限认证**：Shiro + Redis + 双 JWT Token (无感续期、账号安全管控)
-*   **工具与工程化**：Lombok, MapStruct, Redisson, SpringDoc OpenAPI (Swagger 3)
+*   **权限认证**：Spring Security + JWT Access Token + Redis Refresh Token（支持 Token 轮换与 RBAC 权限控制）
+*   **工具与工程化**：Lombok, MapStruct, Redisson, Spring StateMachine, Flyway, SpringDoc OpenAPI (Swagger 3)
 
 ## ✨ 核心特性与架构亮点
 
 ### 1. 完善的电商业务闭环
 *   **商品模块**：支持多级分类、动态规格选项、商品评价与点赞等业务。
-*   **交易链路**：覆盖从加购、结算到下单的全流程；基于 **Redisson 延迟队列** 实现“超时未支付订单自动取消”，无需频繁扫表查询。
+*   **交易链路**：覆盖从加购、结算到下单的全流程；使用 **Spring StateMachine** 约束订单状态流转，并基于 **Redisson 延迟队列** 实现“超时未支付订单自动取消”，无需频繁扫表查询。
 *   **海量状态流转**：通过 Redis ZSet 配合分布式锁与专属线程池，高效实现千万级优惠券到期等定时状态变更。
 
 ### 2. 高可用缓存与并发优化
@@ -31,6 +31,7 @@
 *   **优雅的对象转换**：使用 **MapStruct** 在编译期生成高性能的 `DTO -> Entity -> VO` 转换代码，丢弃低效且不安全的反射拷贝。
 *   **隔离的线程池体系**：拒绝“一池多用”，为订单取消、商品同步、消息消费等各自配备独立的 `ThreadPoolTaskExecutor` 线程池，保障业务隔离与稳定性。
 *   **标准化 API 文档**：全局接入 SpringDoc，利用 Profile 实现多环境隔离（生产环境自动屏蔽接口文档），支持全局 JWT 统一认证调试。
+*   **数据库版本管理**：通过 **Flyway** 维护数据库结构演进，并提供 RBAC、库存字段及消息消费幂等等迁移脚本。
 
 ### 4. 实时在线客服系统
 *   底层基于 Netty 构建 WebSocket 服务器，独立端口（8888）与 HTTP 服务（8080）分离。
@@ -46,7 +47,8 @@ com.app.noobshop
 ├── pojo              # 模型层（包含 DTO/VO/Entity/Enum）
 ├── infrastructure    # 基础设施层（集成 Redis, ES, RocketMQ, Netty 等基建模块）
 ├── job               # 任务调度层（包含初始化、延迟任务、定时任务处理器）
-├── security          # 鉴权层（Shiro + JWT 拦截与认证逻辑）
+├── security          # 安全层（Spring Security、JWT 认证、RBAC 授权与权限缓存）
+├── statemachine      # 状态机层（订单状态与事件流转规则）
 ├── common            # 公共层（全局异常、通用工具类、MapStruct 映射配置）
 └── config            # 全局配置类（Caffeine, Swagger, CORS 等）
 ```
